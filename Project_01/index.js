@@ -1,23 +1,55 @@
 const express = require("express");
-const users = require("./MOCK_DATA.json");
-const fs = require('fs');
+const mongoose = require("mongoose");
+const fs = require("fs");
+const { timeStamp } = require("console");
 const app = express();
 const PORT = 3000;
-//app.use(express.urlencoded({ extended: false}));
+
+// connection to mongodb
+mongoose
+  .connect("mongodb://127.0.0.1:27017/youtube-app-1")
+  .then(() => console.log("connected to mongodb"))
+  .catch((err) => console.log(err));
+
+const userSchema = new mongoose.Schema({
+  firstName: {
+    type: String,
+    required: true,
+  },
+  lastName: {
+    type: String,
+  },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+  },
+  jobTitle: {
+    type: String,
+  },
+  gender: {
+    type: String,
+  },
+}, {timestamps: true});
+
+const User = mongoose.model("User", userSchema);
 
 app.use(express.json());
+app.use(express.urlencoded({ extended: false })); // URL-encoded form data parsing
 
 // Routes
 
 // REST API
-app.get("/api/users", (req, res) => {
-  return res.json(users);
+app.get("/api/users", async(req, res) => {
+  const allDBUsers = await User.find({});
+  return res.json(allDBUsers);
 });
 
-app.get("/users", (req, res) => {
+app.get("/users", async  (req, res) => {
+  const allDBUsers = await User.find({});
   const HTML = `
     <ul>
-        ${users.map((user) => `<li>${user.first_name}</li>`).join("")}
+        ${allDBUsers.map((user) => `<li>${user.firstName} - ${user.email}</li>`).join("")}
     </ul> 
     `;
   res.send(HTML);
@@ -25,39 +57,52 @@ app.get("/users", (req, res) => {
 
 app
   .route("/api/users/:id")
-  .get((req, res) => {
-    const id = Number(req.params.id);
-    const user = users.find((user) => user.id === id);
+  .get(async (req, res) => {
+    const user = await User.findById(req.params.id);
+    if(!user) return res.status(404)
     return res.json(user);
   })
-  .patch((req, res) => {
-    const getId = Number(req.params.id);
-    const body = req.body;
-    const userIndex = users.findIndex((user) => user.id === getId);
-    const gotUser = users[userIndex];
-    const updatedUser = { ...gotUser, ...body};
-    users[userIndex] = updatedUser;
-    fs.writeFile('./MOCK_DATA.json', JSON.stringify(users), (err, data) => {
-      return res.json({ status: "Success", updatedUser});
-    })
-  })
-  .delete((req, res) => {
-    const getId = Number(req.params.id);
-    const userIndex = users.findIndex((user) => user.id === getId);
-    if (userIndex !== -1) {
-        users.splice(userIndex, 1);
+  .patch(async (req, res) => {
+    try {
+      const updatedUser = await User.findByIdAndUpdate(req.params.id, req.body, { new: true });
+  
+      if (!updatedUser) {
+        return res.status(404).json({ status: "Error", message: "User not found" });
+      }
+  
+      return res.json({ status: "Success", updatedUser });
+    } catch (error) {
+      return res.status(500).json({ status: "Error", message: error.message });
     }
-    fs.writeFile('./MOCK_DATA.json', JSON.stringify(users), (err, data) => {
-      return res.json({ status: "Success delete"});
-    })
   })
+  .delete(async (req, res) => {
+    await User.findByIdAndDelete(req.params.id);
+    return res.json({ status: "Success" });
+  });
 
-app.post("/api/users", (req, res) => {
+app.post("/api/users", async (req, res) => {
   const body = req.body;
-  users.push({...body, id : users.length+1});
-  fs.writeFile('./MOCK_DATA.json', JSON.stringify(users), (err,data) => {
-    return res.json({ status: "success" , id : users.length });
-  })
+  if (
+    !body ||
+    !body.first_name ||
+    !body.last_name ||
+    !body.email ||
+    !body.gender ||
+    !body.job_title
+  ) {
+    return res.status(400).json({ status: "All fields are required" });
+  }
+
+  const result = await User.create({
+    firstName: body.first_name,
+    lastName: body.last_name,
+    email: body.email,
+    gender: body.gender,
+    jobTitle: body.job_title,
+  });
+
+  console.log("result", result);
+  return res.status(201).json({ msg: "success" });
 });
 
 app.listen(PORT, () => console.log(`Server listening on ${PORT}`));
