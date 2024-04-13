@@ -5,7 +5,7 @@
 Hello visitor! This repository is dedicated to my journey of learning Node.js. I'm documenting the projects I create while learning, and I hope they'll be useful to you in your Node.js journey as well. The projects in this repository are built using Express.js and MongoDB.
 
 ## Project Details
-## Technologies Used
+### Technologies Used
 
 - Node.js
 - Express.js
